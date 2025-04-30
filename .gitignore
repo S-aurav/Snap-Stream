@@ -1,2 +1,6 @@
-build/
 .vscode/
+build/
+capture_dxgi_old.cpp
+encoder_nvenc_old.cpp
+encoder_nvenc_old.h
+main_old.cpp
