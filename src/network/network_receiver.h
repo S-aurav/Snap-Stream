@@ -13,4 +13,5 @@ public:
 private:
     int listenPort;
     SOCKET listenSocket;
+    SOCKET clientSocket;
 };

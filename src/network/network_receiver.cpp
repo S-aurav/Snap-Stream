@@ -1,65 +1,79 @@
+// network_receiver.cpp
 #include "network_receiver.h"
 #include <iostream>
-#include <cstdint>
-#include <vector>
-#include <WS2tcpip.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
 
-NetworkReceiver::NetworkReceiver(int port) : listenPort(port), listenSocket(INVALID_SOCKET) {}
+NetworkReceiver::NetworkReceiver(int port)
+    : listenPort(port), listenSocket(INVALID_SOCKET), clientSocket(INVALID_SOCKET) {}
 
 bool NetworkReceiver::init() {
-#ifdef _WIN32
     WSADATA wsaData;
-    int wsaErr = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (wsaErr != 0) {
-        std::cerr << "WSAStartup failed: " << wsaErr << std::endl;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        std::cerr << "WSAStartup failed\n";
         return false;
     }
-#endif
 
-    listenSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listenSocket == INVALID_SOCKET) {
-        std::cerr << "Failed to create socket." << std::endl;
+        std::cerr << "Socket creation failed\n";
         return false;
     }
 
-    sockaddr_in recvAddr {};
+    sockaddr_in recvAddr{};
     recvAddr.sin_family = AF_INET;
     recvAddr.sin_port = htons(listenPort);
     recvAddr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(listenSocket, (sockaddr*)&recvAddr, sizeof(recvAddr)) == SOCKET_ERROR) {
-        std::cerr << "Socket bind failed." << std::endl;
-        cleanup();
+        std::cerr << "Bind failed\n";
         return false;
     }
 
-    std::cout << "Listening on port " << listenPort << std::endl;
+    if (listen(listenSocket, 1) == SOCKET_ERROR) {
+        std::cerr << "Listen failed\n";
+        return false;
+    }
+
+    std::cout << "Waiting for incoming connection on port " << listenPort << "...\n";
+    clientSocket = accept(listenSocket, nullptr, nullptr);
+    if (clientSocket == INVALID_SOCKET) {
+        std::cerr << "Accept failed\n";
+        return false;
+    }
+
+    std::cout << "Client connected.\n";
     return true;
 }
 
 bool NetworkReceiver::receivePacket(std::vector<uint8_t>& outData) {
-    char buffer[65536];
-    sockaddr_in senderAddr {};
-    socklen_t senderAddrSize = sizeof(senderAddr);
-
-    int recvLen = recvfrom(listenSocket, buffer, sizeof(buffer), 0,
-                           (sockaddr*)&senderAddr, &senderAddrSize);
-    if (recvLen == SOCKET_ERROR || recvLen <= 0) {
+    int32_t packetSize = 0;
+    int received = recv(clientSocket, reinterpret_cast<char*>(&packetSize), sizeof(packetSize), MSG_WAITALL);
+    if (received != sizeof(packetSize)) {
+        std::cerr << "Failed to receive packet size\n";
         return false;
     }
 
-    outData.assign(buffer, buffer + recvLen);
+    outData.resize(packetSize);
+    size_t totalReceived = 0;
+    while (totalReceived < packetSize) {
+        int chunk = recv(clientSocket, reinterpret_cast<char*>(outData.data()) + totalReceived, packetSize - totalReceived, 0);
+        if (chunk <= 0) {
+            std::cerr << "Failed to receive packet data\n";
+            return false;
+        }
+        totalReceived += chunk;
+    }
     return true;
 }
 
 void NetworkReceiver::cleanup() {
-    if (listenSocket != INVALID_SOCKET) {
-#ifdef _WIN32
-        closesocket(listenSocket);
-        WSACleanup();
-#else
-        close(listenSocket);
-#endif
-        listenSocket = INVALID_SOCKET;
+    if (clientSocket != INVALID_SOCKET) {
+        closesocket(clientSocket);
     }
+    if (listenSocket != INVALID_SOCKET) {
+        closesocket(listenSocket);
+    }
+    WSACleanup();
 }

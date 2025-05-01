@@ -8,7 +8,7 @@ public:
     RendererOpenGL(int width, int height);
     ~RendererOpenGL();
 
-    bool init(int argc, char* argv[]);  // fix to match implementation
+    bool init();  // fix to match implementation
     void renderFrame(const AVFrame* frame); // Or use D3D texture if you are not using AVFrame
     void cleanup();
     
