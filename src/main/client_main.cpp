@@ -10,9 +10,8 @@
 #include <cstdint>
 
 extern "C" {
-    #include <libavutil/log.h>  // Add this include
+    #include <libavutil/log.h>  
 }
-// #include <SDL.h>
 
 int main() {
     av_log_set_level(AV_LOG_DEBUG);

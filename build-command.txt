@@ -7,7 +7,7 @@ Build project:
 
 // using multiple cores
 
-mingw32-make -j $env:NUMBER_OF_PROCESSORS 
+mingw32-make -j $env:NUMBER_OF_PROCESSORS
 
 
 // clean and rebuild
